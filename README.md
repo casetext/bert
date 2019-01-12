@@ -1,4 +1,4 @@
-# BERT
+# BERT (Casetext Fork)
 
 **\*\*\*\*\* New November 23rd, 2018: Un-normalized multilingual model + Thai +
 Mongolian \*\*\*\*\***
