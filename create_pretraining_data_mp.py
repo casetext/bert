@@ -191,13 +191,20 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   # sentence boundaries for the "next sentence prediction" task).
   # (2) Blank lines between documents. Document boundaries are needed so
   # that the "next sentence prediction" task doesn't span between documents.
+  linecounter = 1
   for input_file in input_files:
     with tf.io.gfile.GFile(input_file, "r") as reader:
       while True:
-        line = tokenization.convert_to_unicode(reader.readline())
+        try:
+          line = tokenization.convert_to_unicode(reader.readline())
+        except UnicodeDecodeError as e:
+          tf.logging.info("UnicodeDecodeError in file {} line {}: {}".format(input_file,linecounter,e))
+          continue                       
         if not line:
           break
         line = line.strip()
+        linecounter+= 1
+
 
         # Empty lines are used as document delimiters
         if not line:
