@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import csv
 import collections
 import random
 import tensorflow.compat.v1 as tf
 import tokenization
 import multiprocessing
 import ipdb
+import gc
 
 flags = tf.flags
 
@@ -65,7 +67,10 @@ flags.DEFINE_float(
 
 flags.DEFINE_integer("num_processes", 1, 
                      "Parallelize across multiple processes.")
-  
+
+flags.DEFINE_bool(
+    "log_files", True,
+    "Log processed files")
 
 
 class TrainingInstance(object):
@@ -419,6 +424,12 @@ def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
     else:
       trunc_tokens.pop()
 
+def write_file_log(_input_file,_output_file,file_name='./pretrain_data.log'):
+  with open(file_name, 'a+', newline='') as write_obj:
+          # Create a writer object from csv module
+          csv_writer = csv.writer(write_obj)
+          # Add contents of list as last row in the csv file
+          csv_writer.writerow([_input_file,_output_file])
 
 def write_examples(job_id):
 
@@ -453,20 +464,21 @@ def write_examples(job_id):
   else:
       tf.logging.info("Worker {} Reading from {} ".format(job_id,input_files[0]))
   
-
-  rng = random.Random(FLAGS.random_seed)
-  instances = create_training_instances(
-      input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
-      FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
-      rng)
-
-  
-  tf.logging.info("Worker {} *** Writing to output files ***".format(job_id))
-  for output_file in output_files:
-    tf.logging.info("  %s", output_file)
-
-  write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
-                                  FLAGS.max_predictions_per_seq, output_files)
+  for i,(input_file,output_file) in enumerate(zip(input_files,output_files)):
+    tf.logging.info("Worker {} file {}/{} Reading from {} ".format(job_id,i+1,len(input_files),input_file))
+    rng = random.Random(FLAGS.random_seed)
+    instances = create_training_instances(
+        [input_file], tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
+        FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
+        rng)
+   
+    tf.logging.info("Worker {} Writing to output file {}".format(job_id,output_file))
+    write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
+                                    FLAGS.max_predictions_per_seq, [output_file])
+    if FLAGS.log_files:
+        write_file_log(input_file,output_file)
+    del instances
+    gc.collect()
 
 
 if __name__ == "__main__":
