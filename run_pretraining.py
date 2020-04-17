@@ -22,6 +22,7 @@ import os
 import modeling
 import optimization
 import tensorflow as tf
+import ipdb
 
 flags = tf.flags
 
@@ -60,6 +61,8 @@ flags.DEFINE_integer(
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
 
 flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
+
+flags.DEFINE_bool("use_wandb", False, "Whether to log results using weights and biases.")
 
 flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
 
@@ -490,4 +493,9 @@ if __name__ == "__main__":
   flags.mark_flag_as_required("input_file")
   flags.mark_flag_as_required("bert_config_file")
   flags.mark_flag_as_required("output_dir")
+  ipdb.set_trace()
+  if FLAGS.use_wandb:
+    import wandb
+    wandb.init(project="bert-pretrain", sync_tensorboard=True)  
+    wandb.config.update({k:v.value for k,v in FLAGS.__flags.items()})
   tf.app.run()
