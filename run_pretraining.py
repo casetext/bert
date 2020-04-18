@@ -22,7 +22,6 @@ import os
 import modeling
 import optimization
 import tensorflow as tf
-import ipdb
 
 flags = tf.flags
 
@@ -149,7 +148,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
          bert_config, model.get_pooled_output(), next_sentence_labels)
 
     total_loss = masked_lm_loss + next_sentence_loss
-
+    '''
     tvars = tf.trainable_variables()
 
     initialized_variable_names = {}
@@ -174,6 +173,36 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
         init_string = ", *INIT_FROM_CKPT*"
       tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                       init_string)
+    '''
+
+
+    all_vars = tf.global_variables()
+    scaffold_fn = None
+    if init_checkpoint:
+      assignment_map, initialized_variable_names = modeling.get_assignment_map_from_checkpoint(
+          all_vars, init_checkpoint)
+      if use_tpu:
+        def tpu_scaffold():
+          def init_function():
+            all_vars = tf.global_variables()
+            assignment_map, initialized_variable_names = modeling.get_assignment_map_from_checkpoint(all_vars, init_checkpoint)
+            tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+            tf.logging.info('initialzed tpu checkpoint {}'.format(init_checkpoint))
+            tf.logging.info("**** Trainable Variables ****")
+            for var in all_vars:
+              init_string = ""
+              if var.name in initialized_variable_names:
+                init_ssctring = ", *INIT_FROM_CKPT*"
+              tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape, init_string)
+            tf.logging.info("Model is initialized!")
+          return tf.train.Scaffold(init_fn=init_function())
+        scaffold_fn = tpu_scaffold
+      else:
+        tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+      
+                                
+      tf.logging.info("Model is built!")
+
 
     output_spec = None
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -435,6 +464,7 @@ def main(_):
       master=FLAGS.master,
       model_dir=FLAGS.output_dir,
       save_checkpoints_steps=FLAGS.save_checkpoints_steps,
+      keep_checkpoint_max=None, #keep all checkpoints
       tpu_config=tf.contrib.tpu.TPUConfig(
           iterations_per_loop=FLAGS.iterations_per_loop,
           num_shards=FLAGS.num_tpu_cores,
@@ -493,7 +523,6 @@ if __name__ == "__main__":
   flags.mark_flag_as_required("input_file")
   flags.mark_flag_as_required("bert_config_file")
   flags.mark_flag_as_required("output_dir")
-  ipdb.set_trace()
   if FLAGS.use_wandb:
     import wandb
     wandb.init(project="bert-pretrain", sync_tensorboard=True)  
