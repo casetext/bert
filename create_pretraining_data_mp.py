@@ -68,6 +68,9 @@ flags.DEFINE_float(
 flags.DEFINE_integer("num_processes", 1, 
                      "Parallelize across multiple processes.")
 
+flags.DEFINE_string("input_log", None,
+                    "Input list of files that were alreay processed (or comma-separated list of files).")
+
 flags.DEFINE_bool(
     "log_files", True,
     "Log processed files")
@@ -431,6 +434,16 @@ def write_file_log(_input_file,_output_file,file_name='./pretrain_data.log'):
           # Add contents of list as last row in the csv file
           csv_writer.writerow([_input_file,_output_file])
 
+def read_file_log(file_name):
+  inpt_files,outpt_files= [], []
+  with open(file_name, 'r', newline='') as read_obj:
+    # Create a writer object from csv module
+    spamreader = csv.reader(read_obj, delimiter=',')
+    for row in spamreader:
+      inpt_files.append(row[0]),outpt_files.append(row[1])
+  return inpt_files, outpt_files
+    
+
 def write_examples(job_id):
 
   def log(*args):
@@ -451,6 +464,11 @@ def write_examples(job_id):
     input_files.extend(tf.gfile.Glob(input_pattern))
 
   
+  if FLAGS.input_log:
+    # remove files that were already processed in porevious run
+    already_processed,_=read_file_log(FLAGS.input_log)
+    input_files = list(set(input_files)-set(already_processed))
+     
   input_file_list = sorted(input_files)
   total_files = len(input_files)
   output_file_list = [os.path.join(FLAGS.output_dir, "pretrain_data.tfrecord-{:}-of-{:}".format(i+1, total_files)) \
@@ -463,7 +481,7 @@ def write_examples(job_id):
                                                                                          input_files[0],input_files[-1]))
   else:
       tf.logging.info("Worker {} Reading from {} ".format(job_id,input_files[0]))
-  
+
   for i,(input_file,output_file) in enumerate(zip(input_files,output_files)):
     tf.logging.info("Worker {} file {}/{} Reading from {} ".format(job_id,i+1,len(input_files),input_file))
     rng = random.Random(FLAGS.random_seed)
